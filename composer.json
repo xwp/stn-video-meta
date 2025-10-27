@@ -1,0 +1,26 @@
+{
+    "name": "xwp/stn-video-meta",
+    "description": "Fetches STN Video Meta on save and stores JSON-LD for schema/sitemap.",
+    "type": "wordpress-plugin",
+    "require": {
+        "php": ">=8.0",
+        "composer/installers": "~1.0"
+    },
+    "license": "GPL-2.0-or-later",
+    "authors": [
+        {
+            "name": "XWP",
+            "email": "technology@xwp.co"
+        }
+    ],
+    "support": {
+        "issues": "https://github.com/xwp/stn-video-meta/issues",
+        "source": "https://github.com/xwp/stn-video-meta"
+    },
+    "repositories": [
+        {
+            "type": "vcs",
+            "url": "https://github.com/xwp/stn-video-meta"
+        }
+    ]
+}
