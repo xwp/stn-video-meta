@@ -376,9 +376,10 @@ final class Plugin {
 		}
 
 		// Prefer the post title for the VideoObject name; fall back to API headline.
-		$title_post  = '' !== $post_title ? wp_strip_all_tags( $post_title ) : '';
-		$title_api   = isset( $api['headline'] ) ? (string) $api['headline'] : '';
-		$title       = '' !== $title_post ? $title_post : $title_api;
+		$title_post = '' !== $post_title ? wp_strip_all_tags( $post_title ) : '';
+		$title_api  = isset( $api['headline'] ) ? (string) $api['headline'] : '';
+		$title      = '' !== $title_post ? $title_post : $title_api;
+
 		// Prefer summary for concise description; fall back to full description.
 		$summary     = isset( $api['summary'] ) ? (string) $api['summary'] : '';
 		$description = isset( $api['description'] ) ? (string) $api['description'] : '';
