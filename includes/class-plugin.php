@@ -199,7 +199,7 @@ final class Plugin {
 		foreach ( $keys_current as $key ) {
 			$api = $this->fetch_meta_for_key( $key );
 			if ( ( isset( $api['success'] ) && true === $api['success'] ) ) {
-				$usable_meta = $this->normalize_meta( $api );
+				$usable_meta = $this->normalize_meta( $api, (string) get_the_title( $post_id ) );
 				break;
 			}
 			$code_val = isset( $api['code'] ) ? (int) $api['code'] : 0;
@@ -364,18 +364,22 @@ final class Plugin {
 	/**
 	 * Normalize Meta API response into a compact structure used for schema.
 	 *
-	 * @param array<string,mixed> $api Decoded API response.
+	 * @param array<string,mixed> $api        Decoded API response.
+	 * @param string              $post_title Current post title to override VideoObject name.
 	 * @return array{name:string,description:string,uploadDate:string,thumbnail:string,duration:string,contentUrl:string}
 	 */
-	private function normalize_meta( array $api ): array {
+	private function normalize_meta( array $api, string $post_title = '' ): array {
 		// Use the first story media as the primary video source.
 		$media_first = [];
 		if ( isset( $api['storyMedias'] ) && is_array( $api['storyMedias'] ) && ! empty( $api['storyMedias'] ) ) {
 			$media_first = (array) $api['storyMedias'][0];
 		}
 
+		// Prefer the post title for the VideoObject name; fall back to API headline.
+		$title_post  = '' !== $post_title ? wp_strip_all_tags( $post_title ) : '';
+		$title_api   = isset( $api['headline'] ) ? (string) $api['headline'] : '';
+		$title       = '' !== $title_post ? $title_post : $title_api;
 		// Prefer summary for concise description; fall back to full description.
-		$title       = isset( $api['headline'] ) ? (string) $api['headline'] : '';
 		$summary     = isset( $api['summary'] ) ? (string) $api['summary'] : '';
 		$description = isset( $api['description'] ) ? (string) $api['description'] : '';
 		$desc        = '' !== $summary ? $summary : $description;
