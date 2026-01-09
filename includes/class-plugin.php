@@ -25,8 +25,10 @@ final class Plugin {
 	/**
 	 * Post meta keys (internal storage for normalized data and status).
 	 */
-	private const META_KEY_STATUS = 'stnvm_status'; // Possible values: ok, error, no_shortcode, not_found
-	private const META_KEY_KEYS   = 'stnvm_keys';
+	private const META_KEY_STATUS       = 'stnvm_status'; // Possible values: ok, error, no_shortcode, not_found
+	private const META_KEY_KEYS         = 'stnvm_keys'; // All player keys found (for change detection).
+	private const META_KEY_ACTIVE_KEY   = 'stnvm_active_key'; // The successful key used for schema - only one is used.
+	private const META_KEY_ACTIVE_CID   = 'stnvm_active_cid'; // The CID for the active key.
 
 	/**
 	 * Default schema meta key consumed by the host site.
@@ -178,6 +180,8 @@ final class Plugin {
 			if ( metadata_exists( 'post', $post_id, $this->get_schema_meta_key() ) ) {
 				delete_post_meta( $post_id, $this->get_schema_meta_key() );
 			}
+			delete_post_meta( $post_id, self::META_KEY_ACTIVE_KEY );
+			delete_post_meta( $post_id, self::META_KEY_ACTIVE_CID );
 			return;
 		}
 
@@ -195,11 +199,13 @@ final class Plugin {
 		}
 
 		// Iterate over detected keys until a successful API response or a 404 is encountered.
-		$usable_meta = [];
+		$usable_meta   = [];
+		$successful_key = '';
 		foreach ( $keys_current as $key ) {
 			$api = $this->fetch_meta_for_key( $key );
 			if ( ( isset( $api['success'] ) && true === $api['success'] ) ) {
-				$usable_meta = $this->normalize_meta( $api, (string) get_the_title( $post_id ) );
+				$usable_meta    = $this->normalize_meta( $api, (string) get_the_title( $post_id ) );
+				$successful_key = $key;
 				break;
 			}
 			$code_val = isset( $api['code'] ) ? (int) $api['code'] : 0;
@@ -209,11 +215,15 @@ final class Plugin {
 			}
 		}
 
-		if ( ! empty( $usable_meta ) ) {
+		if ( ! empty( $usable_meta ) && '' !== $successful_key ) {
 			$this->update_meta_if_changed( $post_id, self::META_KEY_STATUS, 'ok' );
 
 			$json = $this->build_schema_json( $usable_meta );
 			$this->update_meta_if_changed( $post_id, $this->get_schema_meta_key(), (string) $json );
+
+			// Store the successful key and CID for sitemap player URL generation.
+			$this->update_meta_if_changed( $post_id, self::META_KEY_ACTIVE_KEY, $successful_key );
+			$this->update_meta_if_changed( $post_id, self::META_KEY_ACTIVE_CID, $this->get_cid() );
 			return;
 		}
 
@@ -222,6 +232,8 @@ final class Plugin {
 		if ( metadata_exists( 'post', $post_id, $this->get_schema_meta_key() ) ) {
 			delete_post_meta( $post_id, $this->get_schema_meta_key() );
 		}
+		delete_post_meta( $post_id, self::META_KEY_ACTIVE_KEY );
+		delete_post_meta( $post_id, self::META_KEY_ACTIVE_CID );
 	}
 
 	/**
