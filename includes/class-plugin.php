@@ -25,10 +25,10 @@ final class Plugin {
 	/**
 	 * Post meta keys (internal storage for normalized data and status).
 	 */
-	private const META_KEY_STATUS       = 'stnvm_status'; // Possible values: ok, error, no_shortcode, not_found
-	private const META_KEY_KEYS         = 'stnvm_keys'; // All player keys found (for change detection).
-	private const META_KEY_ACTIVE_KEY   = 'stnvm_active_key'; // The successful key used for schema - only one is used.
-	private const META_KEY_ACTIVE_CID   = 'stnvm_active_cid'; // The CID for the active key.
+	private const META_KEY_STATUS     = 'stnvm_status'; // Possible values: ok, error, no_shortcode, not_found
+	private const META_KEY_KEYS       = 'stnvm_keys'; // All player keys found (for change detection).
+	private const META_KEY_ACTIVE_KEY = 'stnvm_active_key'; // The successful key used for schema - only one is used.
+	private const META_KEY_ACTIVE_CID = 'stnvm_active_cid'; // The CID for the active key.
 
 	/**
 	 * Default schema meta key consumed by the host site.
@@ -46,11 +46,139 @@ final class Plugin {
 	private const MP4_PRIORITY = [ 'MP43200k', 'MP41080p', 'MP4300k' ];
 
 	/**
+	 * STN embed base URL.
+	 */
+	private const EMBED_BASE = 'https://embed.sendtonews.com';
+
+	/**
 	 * Register hooks for the plugin lifecycle.
 	 */
 	public function __construct() {
-		// Register processing hook: run on save to detect STN embeds and update schema.
 		add_action( 'save_post', [ $this, 'on_save_post' ], 10, 3 );
+		add_action( 'init', [ $this, 'register_embed_handlers' ] );
+	}
+
+	/**
+	 * Register shortcode and block render callback when SendtoNews plugin is not active.
+	 */
+	public function register_embed_handlers(): void {
+		include_once ABSPATH . 'wp-admin/includes/plugin.php';
+
+		if ( is_plugin_active( 'sendtonews/sendtonews.php' ) ) {
+			return;
+		}
+
+		add_shortcode( 'sendtonews', [ $this, 'render_shortcode' ] );
+
+		register_block_type(
+			'sendtonews/playerselector',
+			[
+				'render_callback' => [ $this, 'render_block' ],
+				'attributes'      => [
+					'embedKey' => [
+						'type'    => 'string',
+						'default' => '',
+					],
+				],
+			]
+		);
+	}
+
+	/**
+	 * Render the sendtonews/playerselector block on the frontend.
+	 *
+	 * @param array $attributes Block attributes.
+	 * @return string Rendered HTML.
+	 */
+	public function render_block( array $attributes ): string {
+		$key = $attributes['embedKey'] ?? '';
+		if ( '' === $key ) {
+			return '';
+		}
+
+		return $this->render_shortcode(
+			[
+				'key'  => $key,
+				'type' => 'float',
+			] 
+		);
+	}
+
+	/**
+	 * Render the [sendtonews] shortcode.
+	 *
+	 * @param array|string $atts Shortcode attributes.
+	 * @return string Rendered HTML.
+	 */
+	public function render_shortcode( $atts ): string {
+		$atts = shortcode_atts(
+			[
+				'key'  => '',
+				'type' => 'float',
+				'cid'  => '',
+			],
+			$atts,
+			'sendtonews'
+		);
+
+		$key  = sanitize_text_field( $atts['key'] );
+		$type = sanitize_text_field( $atts['type'] );
+
+		if ( '' === $key ) {
+			return '';
+		}
+
+		// Use override CID if provided, otherwise use stored credentials.
+		$cid = '' !== $atts['cid']
+			? sanitize_text_field( $atts['cid'] )
+			: $this->get_cid();
+
+		if ( '' === $cid ) {
+			return '<!-- stn-video: credentials not configured -->';
+		}
+
+		// Treat 'single' as 'float' (legacy alias).
+		if ( 'single' === $type ) {
+			$type = 'float';
+		}
+
+		$esc_key = esc_attr( $key );
+		$esc_cid = esc_attr( $cid );
+
+		switch ( $type ) {
+			case 'player':
+				$div_class = 's2nPlayer k-' . $esc_key;
+				$data_type = 'float';
+				$script    = self::EMBED_BASE . '/player3/embedcode.js?fk=' . rawurlencode( $key ) . '&cid=' . rawurlencode( $cid );
+				break;
+
+			case 'full':
+				$div_class = 's2nPlayer-' . $esc_key;
+				$data_type = 'full';
+				$script    = self::EMBED_BASE . '/player2/embedcode.php?fk=' . rawurlencode( $key ) . '&cid=' . rawurlencode( $cid );
+				break;
+
+			case 'barker':
+				$div_class = 's2nPlayer-' . $esc_key;
+				$data_type = 'barker';
+				$script    = self::EMBED_BASE . '/player2/embedcode.php?fk=' . rawurlencode( $key ) . '&cid=' . rawurlencode( $cid );
+				break;
+
+			case 'float':
+			default:
+				$div_class = 's2nPlayer k-' . $esc_key;
+				$data_type = 'float';
+				$script    = self::EMBED_BASE . '/player3/embedcode.js?SC=' . rawurlencode( $key ) . '&cid=' . rawurlencode( $cid ) . '&autoplay=on';
+				break;
+		}
+
+		return sprintf(
+			'<div class="%s" data-type="%s"></div>' . "\n"
+			. '<script async type="text/javascript" src="%s" data-type="s2nScript"></script>',
+			esc_attr( $div_class ),
+			esc_attr( $data_type ),
+			esc_url( $script, [ 'https' ] )
+		);
 	}
 
 	/**
@@ -81,38 +209,20 @@ final class Plugin {
 	}
 
 	/**
-	 * Resolve STN credentials from the STN plugin settings (model/options).
+	 * Resolve STN credentials from the Video Settings page.
 	 *
 	 * @return array{cid:string,authcode:string}
 	 */
 	private function get_credentials(): array {
-		// Return cached credentials for the current request if already resolved.
 		if ( is_array( $this->credentials ) ) {
 			return $this->credentials;
 		}
 
-		$cid  = '';
-		$auth = '';
-
-		// STN plugin stores settings in an option as JSON string (contains cid/authcode).
-		$opt_raw = get_option( 'model_sendtonews_settings' );
-		if ( is_string( $opt_raw ) && '' !== $opt_raw ) {
-			$opt = json_decode( $opt_raw, true );
-
-			if ( ! is_array( $opt ) ) {
-				return [
-					'cid'      => '',
-					'authcode' => '',
-				];
-			}
-
-			$cid  = (string) ( $opt['cid'] ?? '' );
-			$auth = (string) ( $opt['authcode'] ?? '' );
-		}
+		$settings = Settings::get_settings();
 
 		$this->credentials = [
-			'cid'      => $cid,
-			'authcode' => $auth,
+			'cid'      => (string) ( $settings['cid'] ?? '' ),
+			'authcode' => (string) ( $settings['authcode'] ?? '' ),
 		];
 		return $this->credentials;
 	}
@@ -199,7 +309,7 @@ final class Plugin {
 		}
 
 		// Iterate over detected keys until a successful API response or a 404 is encountered.
-		$usable_meta   = [];
+		$usable_meta    = [];
 		$successful_key = '';
 		foreach ( $keys_current as $key ) {
 			$api = $this->fetch_meta_for_key( $key );
