@@ -13,11 +13,18 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 /**
+ * Plugin main file path (used by Settings for plugin_action_links filter).
+ */
+define( 'STNVM_MAIN_FILE', __FILE__ );
+
+/**
  * Initialize the plugin.
  */
 function stn_video_meta_init(): void {
+	require_once plugin_dir_path( __FILE__ ) . 'includes/class-settings.php';
 	require_once plugin_dir_path( __FILE__ ) . 'includes/class-plugin.php';
-	// Bootstrap the plugin.
+
+	new \STN\VideoMeta\Settings();
 	new \STN\VideoMeta\Plugin();
 }
 add_action( 'plugins_loaded', 'stn_video_meta_init' );
