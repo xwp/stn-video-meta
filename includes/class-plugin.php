@@ -96,12 +96,9 @@ final class Plugin {
 			return '';
 		}
 
-		return $this->render_shortcode(
-			[
-				'key'  => $key,
-				'type' => 'float',
-			] 
-		);
+		// Route through do_shortcode so the full pipeline runs,
+		// including do_shortcode_tag filters (e.g. performance delay).
+		return do_shortcode( '[sendtonews key="' . esc_attr( $key ) . '" type="float"]' );
 	}
 
 	/**
@@ -113,22 +110,19 @@ final class Plugin {
 	public function render_shortcode( $atts ): string {
 		$atts = shortcode_atts(
 			[
-				'key'  => '',
-				'type' => 'float',
-				'cid'  => '',
+				'key' => '',
+				'cid' => '',
 			],
 			$atts,
 			'sendtonews'
 		);
 
-		$key  = sanitize_text_field( $atts['key'] );
-		$type = sanitize_text_field( $atts['type'] );
+		$key = sanitize_text_field( $atts['key'] );
 
 		if ( '' === $key ) {
 			return '';
 		}
 
-		// Use override CID if provided, otherwise use stored credentials.
 		$cid = '' !== $atts['cid']
 			? sanitize_text_field( $atts['cid'] )
 			: $this->get_cid();
@@ -137,46 +131,13 @@ final class Plugin {
 			return '<!-- stn-video: credentials not configured -->';
 		}
 
-		// Treat 'single' as 'float' (legacy alias).
-		if ( 'single' === $type ) {
-			$type = 'float';
-		}
-
 		$esc_key = esc_attr( $key );
-		$esc_cid = esc_attr( $cid );
-
-		switch ( $type ) {
-			case 'player':
-				$div_class = 's2nPlayer k-' . $esc_key;
-				$data_type = 'float';
-				$script    = self::EMBED_BASE . '/player3/embedcode.js?fk=' . rawurlencode( $key ) . '&cid=' . rawurlencode( $cid );
-				break;
-
-			case 'full':
-				$div_class = 's2nPlayer-' . $esc_key;
-				$data_type = 'full';
-				$script    = self::EMBED_BASE . '/player2/embedcode.php?fk=' . rawurlencode( $key ) . '&cid=' . rawurlencode( $cid );
-				break;
-
-			case 'barker':
-				$div_class = 's2nPlayer-' . $esc_key;
-				$data_type = 'barker';
-				$script    = self::EMBED_BASE . '/player2/embedcode.php?fk=' . rawurlencode( $key ) . '&cid=' . rawurlencode( $cid );
-				break;
-
-			case 'float':
-			default:
-				$div_class = 's2nPlayer k-' . $esc_key;
-				$data_type = 'float';
-				$script    = self::EMBED_BASE . '/player3/embedcode.js?SC=' . rawurlencode( $key ) . '&cid=' . rawurlencode( $cid ) . '&autoplay=on';
-				break;
-		}
+		$script  = self::EMBED_BASE . '/player3/embedcode.js?SC=' . rawurlencode( $key ) . '&cid=' . rawurlencode( $cid ) . '&autoplay=on';
 
 		return sprintf(
-			'<div class="%s" data-type="%s"></div>' . "\n"
+			'<div class="s2nPlayer k-%s" data-type="float"></div>' . "\n"
 			. '<script async type="text/javascript" src="%s" data-type="s2nScript"></script>',
-			esc_attr( $div_class ),
-			esc_attr( $data_type ),
+			$esc_key,
 			esc_url( $script, [ 'https' ] )
 		);
 	}
