@@ -97,17 +97,17 @@ final class Settings {
 					</tbody>
 				</table>
 
-				<?php submit_button( __( 'Save Video Settings', 'stn-video-meta' ) ); ?>
-			</form>
+				<?php
+				/**
+				 * Hook for other plugins to render additional settings sections.
+				 *
+				 * Used by stn-video-performance to render its performance options.
+				 */
+				do_action( 'stn_video_settings_sections' );
 
-			<?php
-			/**
-			 * Hook for other plugins to render additional settings sections.
-			 *
-			 * Used by stn-video-performance to render its performance options.
-			 */
-			do_action( 'stn_video_settings_sections' );
-			?>
+				submit_button( __( 'Save Settings', 'stn-video-meta' ) );
+				?>
+			</form>
 		</div>
 		<?php
 	}
@@ -143,6 +143,14 @@ final class Settings {
 				'authcode' => $authcode,
 			]
 		);
+
+		/**
+		 * Fires after the main video settings are saved, before redirect.
+		 *
+		 * Allows other plugins (e.g. stn-video-performance) to save their
+		 * fields from the shared form.
+		 */
+		do_action( 'stn_video_settings_saved' );
 
 		wp_safe_redirect(
 			add_query_arg(
