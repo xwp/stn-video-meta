@@ -70,18 +70,7 @@ final class Plugin {
 
 		add_shortcode( 'sendtonews', [ $this, 'render_shortcode' ] );
 
-		register_block_type(
-			'sendtonews/playerselector',
-			[
-				'render_callback' => [ $this, 'render_block' ],
-				'attributes'      => [
-					'embedKey' => [
-						'type'    => 'string',
-						'default' => '',
-					],
-				],
-			]
-		);
+		register_block_type( plugin_dir_path( STNVM_MAIN_FILE ) . 'blocks/sendtonews-player' );
 	}
 
 	/**

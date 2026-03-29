@@ -1,0 +1,23 @@
+{
+	"$schema": "https://schemas.wp.org/trunk/block.json",
+	"apiVersion": 3,
+	"name": "sendtonews/playerselector",
+	"title": "STN Video Single",
+	"category": "embed",
+	"icon": "video-alt3",
+	"description": "Embed a single STN video by Player ID.",
+	"keywords": [ "stn", "video", "sendtonews", "player" ],
+	"attributes": {
+		"embedKey": {
+			"type": "string",
+			"default": ""
+		}
+	},
+	"supports": {
+		"html": false,
+		"multiple": true
+	},
+	"textdomain": "stn-video-meta",
+	"editorScript": "file:./index.js",
+	"render": "file:./render.php"
+}
